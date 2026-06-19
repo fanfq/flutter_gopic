@@ -5,16 +5,16 @@ import '../app/mac_ui.dart';
 import '../models/settings_model.dart';
 import '../services/settings_service.dart';
 
-class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.selectedProvider});
+class CloudScreen extends StatefulWidget {
+  const CloudScreen({super.key, required this.selectedProvider});
 
   final CloudProvider selectedProvider;
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  State<CloudScreen> createState() => _CloudScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _CloudScreenState extends State<CloudScreen> {
   String? _selectedProfileId;
 
   final _name = TextEditingController();
@@ -47,7 +47,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   @override
-  void didUpdateWidget(covariant SettingsScreen oldWidget) {
+  void didUpdateWidget(covariant CloudScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedProvider == widget.selectedProvider) return;
     final model = context.read<SettingsModel>();
