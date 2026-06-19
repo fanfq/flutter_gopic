@@ -1,0 +1,39 @@
+name: flutter_gopic
+description: "A PicGo-style CDN image upload tool built with Flutter. v1 supports Cloudflare R2 on macOS."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.8
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  # State management
+  provider: ^6.1.2
+  # Local persistence (R2 credentials, history index)
+  shared_preferences: ^2.3.2
+  path_provider: ^2.1.5
+  # Crypto for AWS Signature V4 signing
+  crypto: ^3.0.6
+  # Filesystem helpers
+  path: ^1.9.0
+  # Native file open dialog + drag-and-drop on desktop
+  file_selector: ^1.0.3
+  # Native OS file drag-and-drop (no Swift code required)
+  desktop_drop: ^0.4.4
+  # Misc
+  intl: ^0.19.0
+  image: ^4.8.0
+  package_info_plus: ^10.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/icon.png
