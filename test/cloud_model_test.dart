@@ -1,28 +1,44 @@
-import 'package:flutter_gopic/models/settings_model.dart';
+import 'package:flutter_gopic/models/cloud_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('loads legacy R2 settings as an enabled Cloudflare R2 profile', () {
-    final model = SettingsModel()
-      ..loadFromMap({
-        'accountId': 'acc',
-        'accessKeyId': 'ak',
-        'secretAccessKey': 'sk',
-        'bucket': 'bucket',
-        'endpoint': 'https://acc.r2.cloudflarestorage.com',
-        'publicDomain': 'https://cdn.test',
-        'pathPrefix': 'images',
-      });
+  test('defaults and persists the upload naming pattern', () {
+    final model = CloudModel();
 
-    expect(
-      model.profiles.map((p) => p.provider),
-      contains(CloudProvider.cloudflareR2),
-    );
-    expect(model.activeProfile?.provider, CloudProvider.cloudflareR2);
-    expect(model.activeProfile?.isEnabled, isTrue);
-    expect(model.activeProfile?.bucket, 'bucket');
-    expect(model.isConfigured, isTrue);
+    expect(model.uploadNamingPattern, UploadNamingPattern.datedHashFileName);
+
+    model.setUploadNamingPattern(UploadNamingPattern.uuid);
+    expect(model.toMap()['uploadNamingPattern'], 'uuid');
+
+    final restored = CloudModel()
+      ..loadFromMap({'profiles': const [], 'uploadNamingPattern': 'datedUuid'});
+    expect(restored.uploadNamingPattern, UploadNamingPattern.datedUuid);
   });
+
+  test(
+    'loads legacy R2 cloud configuration as an enabled Cloudflare R2 profile',
+    () {
+      final model = CloudModel()
+        ..loadFromMap({
+          'accountId': 'acc',
+          'accessKeyId': 'ak',
+          'secretAccessKey': 'sk',
+          'bucket': 'bucket',
+          'endpoint': 'https://acc.r2.cloudflarestorage.com',
+          'publicDomain': 'https://cdn.test',
+          'pathPrefix': 'images',
+        });
+
+      expect(
+        model.profiles.map((p) => p.provider),
+        contains(CloudProvider.cloudflareR2),
+      );
+      expect(model.activeProfile?.provider, CloudProvider.cloudflareR2);
+      expect(model.activeProfile?.isEnabled, isTrue);
+      expect(model.activeProfile?.bucket, 'bucket');
+      expect(model.isConfigured, isTrue);
+    },
+  );
 
   test(
     'active profile falls back to another enabled profile and compression obeys threshold',
@@ -44,7 +60,7 @@ void main() {
         isEnabled: true,
         endpoint: 'https://s3.us-east-1.amazonaws.com',
       );
-      final model = SettingsModel()
+      final model = CloudModel()
         ..loadFromMap({
           'activeProfileId': 'r2',
           'profiles': [disabled.toMap(), enabled.toMap()],
@@ -77,7 +93,7 @@ void main() {
         endpoint: 'https://r2.example.com',
       );
       final another = selected.copyWith(id: 'another', name: 'Another');
-      final model = SettingsModel()
+      final model = CloudModel()
         ..loadFromMap({
           'activeProfileId': 'selected',
           'profiles': [
@@ -105,7 +121,7 @@ void main() {
       isEnabled: true,
     );
     final disabled = enabled.copyWith(id: 'disabled', isEnabled: false);
-    final model = SettingsModel()
+    final model = CloudModel()
       ..loadFromMap({
         'profiles': [enabled.toMap(), disabled.toMap()],
       });
@@ -132,7 +148,7 @@ void main() {
         endpoint: 'https://up-z0.qiniup.com',
         publicDomain: 'https://cdn.example.com',
       );
-      final model = SettingsModel()
+      final model = CloudModel()
         ..loadFromMap({
           'activeProfileId': 'qiniu',
           'profiles': [qiniu.toMap()],
@@ -181,7 +197,7 @@ void main() {
       bucket: 'bucket',
       endpoint: 'https://r2.example.com',
     );
-    final model = SettingsModel()
+    final model = CloudModel()
       ..loadFromMap({
         'activeProfileId': 'qiniu',
         'profiles': [qiniu.toMap(), r2.toMap()],
@@ -192,4 +208,36 @@ void main() {
     expect(model.activeProfile?.id, 'qiniu');
     expect(model.isConfigured, isFalse);
   });
+
+  test(
+    'merge keeps the current selectable profile when imported active profile is disabled',
+    () {
+      final first = CloudProfile(
+        id: 'first',
+        provider: CloudProvider.cloudflareR2,
+        name: 'First',
+        isEnabled: true,
+      );
+      final second = first.copyWith(id: 'second', name: 'Second');
+      final disabledImported = first.copyWith(
+        id: 'disabled-imported',
+        name: 'Disabled imported',
+        isEnabled: false,
+      );
+      final model = CloudModel()
+        ..loadFromMap({
+          'activeProfileId': 'second',
+          'profiles': [first.toMap(), second.toMap()],
+          'compression': {'enabled': false, 'thresholdBytes': 1, 'quality': 70},
+        });
+
+      model.mergeFromMap({
+        'activeProfileId': 'disabled-imported',
+        'profiles': [disabledImported.toMap()],
+        'compression': {'enabled': true, 'thresholdBytes': 2, 'quality': 80},
+      });
+
+      expect(model.activeProfileId, 'second');
+    },
+  );
 }

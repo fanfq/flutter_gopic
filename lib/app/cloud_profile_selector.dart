@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../models/settings_model.dart';
-import '../services/settings_service.dart';
+import '../models/cloud_model.dart';
+import '../services/cloud_service.dart';
 
 class CloudProfileSelector extends StatelessWidget {
   const CloudProfileSelector({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsModel>();
-    final profiles = settings.selectableProfiles;
+    final cloud = context.watch<CloudModel>();
+    final profiles = cloud.selectableProfiles;
     if (profiles.isEmpty) {
       return SizedBox(
         width: 220,
@@ -31,8 +31,8 @@ class CloudProfileSelector extends StatelessWidget {
     return SizedBox(
       width: 260,
       child: DropdownButtonFormField<String>(
-        key: ValueKey(settings.activeProfile?.id),
-        initialValue: settings.activeProfile?.id,
+        key: ValueKey(cloud.activeProfile?.id),
+        initialValue: cloud.activeProfile?.id,
         isExpanded: true,
         decoration: const InputDecoration(
           prefixIcon: Icon(Icons.cloud_queue_outlined),
@@ -50,8 +50,8 @@ class CloudProfileSelector extends StatelessWidget {
         ],
         onChanged: (id) async {
           if (id == null) return;
-          settings.setActiveProfile(id);
-          await context.read<SettingsService>().save();
+          cloud.setActiveProfile(id);
+          await context.read<CloudService>().save();
         },
       ),
     );

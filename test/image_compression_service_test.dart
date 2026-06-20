@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter_gopic/models/settings_model.dart';
+import 'package:flutter_gopic/models/cloud_model.dart';
 import 'package:flutter_gopic/services/image_compression_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as img;
@@ -17,15 +17,11 @@ void main() {
       final service = ImageCompressionService();
       final disabled = await service.prepare(
         file,
-        const CompressionSettings(
-          enabled: false,
-          thresholdBytes: 1,
-          quality: 50,
-        ),
+        const CompressionConfig(enabled: false, thresholdBytes: 1, quality: 50),
       );
       final underThreshold = await service.prepare(
         file,
-        CompressionSettings(
+        CompressionConfig(
           enabled: true,
           thresholdBytes: await file.length() + 1,
           quality: 50,
@@ -52,7 +48,7 @@ void main() {
 
     final result = await ImageCompressionService().prepare(
       file,
-      const CompressionSettings(enabled: true, thresholdBytes: 1, quality: 40),
+      const CompressionConfig(enabled: true, thresholdBytes: 1, quality: 40),
     );
 
     expect(result.wasCompressed, isTrue);

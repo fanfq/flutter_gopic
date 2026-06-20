@@ -8,8 +8,8 @@ import 'package:provider/provider.dart';
 
 import '../app/cloud_profile_selector.dart';
 import '../app/mac_ui.dart';
-import '../models/settings_model.dart';
-import '../services/settings_service.dart';
+import '../models/cloud_model.dart';
+import '../services/cloud_service.dart';
 import '../services/tray_service.dart';
 import '../services/upload_service.dart';
 
@@ -40,7 +40,7 @@ class _UploadScreenState extends State<UploadScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_compressionFieldsReady) return;
-    final compression = context.read<SettingsModel>().compression;
+    final compression = context.read<CloudModel>().compression;
     _thresholdController.text = _bytesToMb(compression.thresholdBytes);
     _qualityController.text = compression.quality.toString();
     _compressionFieldsReady = true;
@@ -55,8 +55,8 @@ class _UploadScreenState extends State<UploadScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final settings = context.watch<SettingsModel>();
-    final configured = settings.isConfigured;
+    final cloud = context.watch<CloudModel>();
+    final configured = cloud.isConfigured;
 
     return MacPage(
       title: '上传',
@@ -86,7 +86,7 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   Widget _configBanner(BuildContext context) {
-    final active = context.watch<SettingsModel>().activeProfile;
+    final active = context.watch<CloudModel>().activeProfile;
     return MacPanel(
       padding: EdgeInsets.zero,
       child: Material(
@@ -104,8 +104,8 @@ class _UploadScreenState extends State<UploadScreen> {
               Expanded(
                 child: Text(
                   active == null
-                      ? '尚未启用可用的云服务配置，请先到「设置」启用并填写参数。'
-                      : '${active.name} 配置不完整，请到「设置」检查参数。',
+                      ? '尚未启用可用的云服务配置，请先到「云服务」启用并填写参数。'
+                      : '${active.name} 配置不完整，请到「云服务」检查参数。',
                   style: TextStyle(
                     color: Theme.of(context).colorScheme.onErrorContainer,
                   ),
@@ -119,8 +119,8 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   Widget _compressionPanel(BuildContext context) {
-    final settings = context.watch<SettingsModel>();
-    final compression = settings.compression;
+    final cloud = context.watch<CloudModel>();
+    final compression = cloud.compression;
     return MacPanel(
       child: Row(
         children: [
@@ -354,8 +354,8 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   Future<void> _updateCompression({bool? enabled}) async {
-    final settings = context.read<SettingsModel>();
-    final current = settings.compression;
+    final cloud = context.read<CloudModel>();
+    final current = cloud.compression;
     final thresholdMb = double.tryParse(_thresholdController.text.trim()) ?? 1;
     final quality =
         int.tryParse(_qualityController.text.trim()) ?? current.quality;
@@ -366,8 +366,8 @@ class _UploadScreenState extends State<UploadScreen> {
     );
     _thresholdController.text = _bytesToMb(next.thresholdBytes);
     _qualityController.text = next.quality.toString();
-    settings.setCompression(next);
-    await context.read<SettingsService>().save();
+    cloud.setCompression(next);
+    await context.read<CloudService>().save();
   }
 
   String _bytesToMb(int bytes) {

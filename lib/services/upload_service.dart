@@ -3,12 +3,13 @@ import 'dart:io';
 import 'dart:math';
 
 import '../models/history_model.dart';
-import '../models/settings_model.dart';
+import '../models/cloud_model.dart';
 import 'aws_signer.dart';
 import 'history_service.dart';
 import 'image_compression_service.dart';
+import 'object_name_generator.dart';
 import 'qiniu_signer.dart';
-import 'settings_service.dart';
+import 'cloud_service.dart';
 
 class UploadResult {
   final String url;
@@ -29,22 +30,25 @@ class UploadException implements Exception {
 /// Orchestrates uploads to Cloudflare R2 via its S3-compatible API.
 class UploadService {
   UploadService({
-    required this.settingsService,
+    required this.cloudService,
     required this.historyService,
     ImageCompressionService? imageCompressionService,
+    ObjectNameGenerator? objectNameGenerator,
   }) : imageCompressionService =
-           imageCompressionService ?? ImageCompressionService();
+           imageCompressionService ?? ImageCompressionService(),
+       objectNameGenerator = objectNameGenerator ?? ObjectNameGenerator();
 
-  final SettingsService settingsService;
+  final CloudService cloudService;
   final HistoryService historyService;
   final ImageCompressionService imageCompressionService;
+  final ObjectNameGenerator objectNameGenerator;
 
-  SettingsModel get _settings => settingsService.model;
+  CloudModel get _cloud => cloudService.model;
 
   CloudProfile _requireProfile() {
-    final profile = _settings.activeProfile;
+    final profile = _cloud.activeProfile;
     if (profile == null) {
-      throw UploadException('尚未启用可用的云服务配置，请在「设置」中启用并填写参数。');
+      throw UploadException('尚未启用可用的云服务配置，请在「云服务」中启用并填写参数。');
     }
     if (!profile.isUploadSupported) {
       throw UploadException('${profile.provider.label} 暂未接入上传协议。');
@@ -63,7 +67,7 @@ class UploadService {
 
     final prepared = await imageCompressionService.prepare(
       file,
-      _settings.compression,
+      _cloud.compression,
     );
     final bytes = prepared.bytes;
     final size = bytes.length;
@@ -159,25 +163,23 @@ class UploadService {
     }
   }
 
-  /// Build the S3-compatible object key: optional prefix + dated folder + unique name.
+  /// Build the S3-compatible object key: optional prefix + selected object name.
   String _buildS3ObjectKey(CloudProfile profile, String fileName) {
     return '/${profile.bucket.trim()}/${_buildObjectName(profile, fileName)}';
   }
 
   String _buildObjectName(CloudProfile profile, String fileName) {
     final prefix = profile.pathPrefix.trim();
-    final base = fileName;
-    final now = DateTime.now();
-    final datePart =
-        '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-    final rand = _randomToken(6);
-    final safeBase = _safeName(base);
     final segments = <String>[];
     if (prefix.isNotEmpty) {
       segments.add(prefix.replaceAll(RegExp(r'^/+|/+$'), ''));
     }
-    segments.add(datePart);
-    segments.add('${rand}_$safeBase');
+    segments.add(
+      objectNameGenerator.build(
+        pattern: _cloud.uploadNamingPattern,
+        fileName: fileName,
+      ),
+    );
     return segments.where((s) => s.isNotEmpty).join('/');
   }
 
@@ -345,10 +347,6 @@ class UploadService {
   String _basename(String path) {
     final parts = path.split(RegExp(r'[/\\]'));
     return parts.isEmpty ? path : parts.last;
-  }
-
-  String _safeName(String name) {
-    return name.replaceAll(RegExp(r'[^\w.\-]+'), '_');
   }
 
   String _newId() {

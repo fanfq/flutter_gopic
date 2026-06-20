@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 import '../app/cloud_profile_selector.dart';
 import '../app/mac_ui.dart';
 import '../models/history_model.dart';
-import '../models/settings_model.dart';
+import '../models/cloud_model.dart';
 import '../services/history_service.dart';
 import '../utils/format.dart';
 
@@ -17,7 +17,7 @@ class GalleryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final history = context.watch<HistoryModel>();
-    final activeProfile = context.watch<SettingsModel>().activeProfile;
+    final activeProfile = context.watch<CloudModel>().activeProfile;
     final items = history.itemsForProfile(activeProfile?.id);
 
     return MacPage(
@@ -80,7 +80,7 @@ class GalleryScreen extends StatelessWidget {
       ),
     );
     if (ok == true && context.mounted) {
-      final profileId = context.read<SettingsModel>().activeProfile?.id;
+      final profileId = context.read<CloudModel>().activeProfile?.id;
       if (profileId != null) {
         await context.read<HistoryService>().clearProfile(profileId);
       }

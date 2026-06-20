@@ -5,15 +5,15 @@ import 'package:provider/provider.dart';
 
 import 'app/theme.dart';
 import 'models/history_model.dart';
-import 'models/settings_model.dart';
+import 'models/cloud_model.dart';
 import 'services/history_service.dart';
-import 'services/settings_service.dart';
+import 'services/cloud_service.dart';
 import 'services/tray_service.dart';
 import 'services/upload_service.dart';
 import 'screens/upload_screen.dart';
 import 'screens/gallery_screen.dart';
-import 'screens/settings_screen.dart';
-
+import 'screens/cloud_screen.dart';
+import 'screens/configuration_screen.dart';
 
 const _fallbackAppVersion = '1.0.0';
 typedef AppVersionLoader = Future<String> Function();
@@ -35,8 +35,6 @@ String _formatAppVersion(String version, String buildNumber) {
   return '$displayVersion ($trimmedBuildNumber)';
 }
 
-
-
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const GoPicApp());
@@ -49,23 +47,23 @@ class GoPicApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        Provider<SettingsService>(create: (_) => SettingsService()),
+        Provider<CloudService>(create: (_) => CloudService()),
         Provider<HistoryService>(create: (_) => HistoryService()),
-        ProxyProvider2<SettingsService, HistoryService, UploadService>(
+        ProxyProvider2<CloudService, HistoryService, UploadService>(
           create: (context) => UploadService(
-            settingsService: context.read<SettingsService>(),
+            cloudService: context.read<CloudService>(),
             historyService: context.read<HistoryService>(),
           ),
-          update: (context, settings, history, previous) =>
+          update: (context, cloud, history, previous) =>
               previous ??
-              UploadService(settingsService: settings, historyService: history),
+              UploadService(cloudService: cloud, historyService: history),
         ),
         ProxyProvider<UploadService, TrayService>(
           update: (context, upload, previous) =>
               previous ?? TrayService(uploadService: upload),
         ),
-        ChangeNotifierProvider<SettingsModel>(
-          create: (context) => context.read<SettingsService>().model,
+        ChangeNotifierProvider<CloudModel>(
+          create: (context) => context.read<CloudService>().model,
         ),
         ChangeNotifierProvider<HistoryModel>(
           create: (context) => context.read<HistoryService>().model,
@@ -83,7 +81,7 @@ class GoPicApp extends StatelessWidget {
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
           themeMode: ThemeMode.system,
-          home: const HomeScreen(appVersionLoader:_loadAppVersionFromPackage),
+          home: const HomeScreen(appVersionLoader: _loadAppVersionFromPackage),
         ),
       ),
     );
@@ -91,9 +89,8 @@ class GoPicApp extends StatelessWidget {
 }
 
 class HomeScreen extends StatefulWidget {
-
   final AppVersionLoader appVersionLoader;
-  const HomeScreen({super.key,required this.appVersionLoader});
+  const HomeScreen({super.key, required this.appVersionLoader});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -101,7 +98,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _index = 0;
-  CloudProvider _settingsProvider = CloudProvider.cloudflareR2;
+  CloudProvider _cloudProvider = CloudProvider.cloudflareR2;
 
   var _appVersion = _fallbackAppVersion;
 
@@ -110,7 +107,6 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadAppVersion();
   }
-
 
   Future<void> _loadAppVersion() async {
     try {
@@ -124,13 +120,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final screens = <Widget>[
       const UploadScreen(),
       const GalleryScreen(),
-      SettingsScreen(selectedProvider: _settingsProvider),
+      CloudScreen(selectedProvider: _cloudProvider),
+      const ConfigurationScreen(),
     ];
     return Scaffold(
       body: LayoutBuilder(
@@ -146,11 +142,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   _MacSidebar(
                     selectedIndex: _index,
-                    selectedSettingsProvider: _settingsProvider,
+                    selectedCloudProvider: _cloudProvider,
                     onSelected: (i) => setState(() => _index = i),
-                    onSettingsProviderSelected: (provider) => setState(() {
+                    onCloudProviderSelected: (provider) => setState(() {
                       _index = 2;
-                      _settingsProvider = provider;
+                      _cloudProvider = provider;
                     }),
                     appVersion: _appVersion,
                   ),
@@ -169,22 +165,22 @@ class _HomeScreenState extends State<HomeScreen> {
 class _MacSidebar extends StatelessWidget {
   const _MacSidebar({
     required this.selectedIndex,
-    required this.selectedSettingsProvider,
+    required this.selectedCloudProvider,
     required this.onSelected,
-    required this.onSettingsProviderSelected,
+    required this.onCloudProviderSelected,
     required this.appVersion,
   });
 
   final int selectedIndex;
-  final CloudProvider selectedSettingsProvider;
+  final CloudProvider selectedCloudProvider;
   final ValueChanged<int> onSelected;
-  final ValueChanged<CloudProvider> onSettingsProviderSelected;
+  final ValueChanged<CloudProvider> onCloudProviderSelected;
   final String appVersion;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final settings = context.watch<SettingsModel>();
+    final cloud = context.watch<CloudModel>();
     return Container(
       width: 220,
       color: scheme.surfaceContainer,
@@ -205,7 +201,7 @@ class _MacSidebar extends StatelessWidget {
                         color: scheme.primary,
                         borderRadius: BorderRadius.circular(7),
                       ),
-                      child: Image.asset("assets/icon.png")
+                      child: Image.asset("assets/icon.png"),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
@@ -248,9 +244,9 @@ class _MacSidebar extends StatelessWidget {
                     children: [
                       for (final provider in CloudProvider.values)
                         _SidebarSubItem(
-                          selected: provider == selectedSettingsProvider,
-                          label: settings.providerMenuLabel(provider),
-                          onTap: () => onSettingsProviderSelected(provider),
+                          selected: provider == selectedCloudProvider,
+                          label: cloud.providerMenuLabel(provider),
+                          onTap: () => onCloudProviderSelected(provider),
                         ),
                     ],
                   ),
@@ -260,8 +256,8 @@ class _MacSidebar extends StatelessWidget {
                 selected: selectedIndex == 3,
                 icon: Icons.settings_outlined,
                 selectedIcon: Icons.settings_rounded,
-                label: '设置',
-                onTap: () {},
+                label: '配置',
+                onTap: () => onSelected(3),
               ),
 
               const Spacer(),
@@ -272,15 +268,13 @@ class _MacSidebar extends StatelessWidget {
               //     color: scheme.onSurfaceVariant,
               //   ),
               // ),
-
               _SidebarFooter(
                 versionLabel: '版本 $appVersion',
                 aboutLabel: 'about',
-                onAbout: (){
-                  //todo 跳转至浏览器
+                onAbout: () {
+                  //todo 跳转至浏览器 https://github.com/fanfq/flutter_gopic
                 },
               ),
-
             ],
           ),
         ),
@@ -402,7 +396,6 @@ class _SidebarItem extends StatelessWidget {
   }
 }
 
-
 class _SidebarFooter extends StatelessWidget {
   const _SidebarFooter({
     required this.versionLabel,
@@ -458,4 +451,3 @@ class _SidebarFooter extends StatelessWidget {
     );
   }
 }
-

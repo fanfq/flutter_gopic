@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../app/mac_ui.dart';
-import '../models/settings_model.dart';
-import '../services/settings_service.dart';
+import '../models/cloud_model.dart';
+import '../services/cloud_service.dart';
 
 class CloudScreen extends StatefulWidget {
   const CloudScreen({super.key, required this.selectedProvider});
@@ -36,7 +36,7 @@ class _CloudScreenState extends State<CloudScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_initialized) return;
-    final model = context.read<SettingsModel>();
+    final model = context.read<CloudModel>();
     final active = model.activeProfile;
     final profiles = model.profilesFor(widget.selectedProvider);
     _selectedProfileId = active?.provider == widget.selectedProvider
@@ -50,7 +50,7 @@ class _CloudScreenState extends State<CloudScreen> {
   void didUpdateWidget(covariant CloudScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedProvider == widget.selectedProvider) return;
-    final model = context.read<SettingsModel>();
+    final model = context.read<CloudModel>();
     final profiles = model.profilesFor(widget.selectedProvider);
     setState(() {
       _selectedProfileId = profiles.isEmpty ? null : profiles.first.id;
@@ -74,7 +74,7 @@ class _CloudScreenState extends State<CloudScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final model = context.watch<SettingsModel>();
+    final model = context.watch<CloudModel>();
     final profiles = model.profilesFor(widget.selectedProvider);
     final selected = _selectedProfile(model);
 
@@ -104,7 +104,7 @@ class _CloudScreenState extends State<CloudScreen> {
     );
   }
 
-  Widget _profileList(SettingsModel model, List<CloudProfile> profiles) {
+  Widget _profileList(CloudModel model, List<CloudProfile> profiles) {
     return MacPanel(
       padding: const EdgeInsets.all(8),
       child: Column(
@@ -125,7 +125,7 @@ class _CloudScreenState extends State<CloudScreen> {
                 icon: const Icon(Icons.add_rounded),
                 onPressed: () {
                   model.addProfile(widget.selectedProvider);
-                  context.read<SettingsService>().save();
+                  context.read<CloudService>().save();
                   setState(() {
                     _selectedProfileId = model
                         .profilesFor(widget.selectedProvider)
@@ -354,7 +354,7 @@ class _CloudScreenState extends State<CloudScreen> {
     );
   }
 
-  CloudProfile? _selectedProfile(SettingsModel model) {
+  CloudProfile? _selectedProfile(CloudModel model) {
     final profiles = model.profilesFor(widget.selectedProvider);
     if (profiles.isEmpty) return null;
     return profiles.firstWhere(
@@ -363,7 +363,7 @@ class _CloudScreenState extends State<CloudScreen> {
     );
   }
 
-  void _loadSelectedProfile(SettingsModel model) {
+  void _loadSelectedProfile(CloudModel model) {
     final profile = _selectedProfile(model);
     if (profile != null) _loadProfile(profile);
   }
@@ -383,7 +383,7 @@ class _CloudScreenState extends State<CloudScreen> {
   }
 
   Future<void> _save() async {
-    final model = context.read<SettingsModel>();
+    final model = context.read<CloudModel>();
     final profile = _selectedProfile(model);
     if (profile == null) return;
     final updated = profile.copyWith(
@@ -406,7 +406,7 @@ class _CloudScreenState extends State<CloudScreen> {
       usePathStyle: _usePathStyle,
     );
     model.upsertProfile(updated);
-    await context.read<SettingsService>().save();
+    await context.read<CloudService>().save();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -434,9 +434,9 @@ class _CloudScreenState extends State<CloudScreen> {
       ),
     );
     if (ok != true || !mounted) return;
-    final model = context.read<SettingsModel>();
+    final model = context.read<CloudModel>();
     model.deleteProfile(profile.id);
-    await context.read<SettingsService>().save();
+    await context.read<CloudService>().save();
     final remaining = model.profilesFor(widget.selectedProvider);
     setState(() {
       _selectedProfileId = remaining.isEmpty ? null : remaining.first.id;
@@ -503,7 +503,7 @@ class _ProfileButton extends StatelessWidget {
                 ),
                 IconButton(
                   tooltip: '删除配置项',
-                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 18,color: Colors.redAccent,),
                   onPressed: onDelete,
                 ),
               ],

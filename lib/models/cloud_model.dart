@@ -29,9 +29,28 @@ enum CloudProvider {
   }
 }
 
+enum UploadNamingPattern {
+  datedHashFileName,
+  datedUuid,
+  uuid;
+
+  String get label => switch (this) {
+    UploadNamingPattern.datedHashFileName => '{YYYYMMDD}/{HASH}_{FILENAME}',
+    UploadNamingPattern.datedUuid => '{YYYYMMDD}/{UUID}.{EXT}',
+    UploadNamingPattern.uuid => '{UUID}.{EXT}',
+  };
+
+  static UploadNamingPattern fromName(String? value) {
+    return UploadNamingPattern.values.firstWhere(
+      (pattern) => pattern.name == value,
+      orElse: () => UploadNamingPattern.datedHashFileName,
+    );
+  }
+}
+
 @immutable
-class CompressionSettings {
-  const CompressionSettings({
+class CompressionConfig {
+  const CompressionConfig({
     this.enabled = false,
     this.thresholdBytes = 1024 * 1024,
     this.quality = 70,
@@ -43,21 +62,21 @@ class CompressionSettings {
 
   bool shouldCompress(int sizeBytes) => enabled && sizeBytes > thresholdBytes;
 
-  CompressionSettings copyWith({
+  CompressionConfig copyWith({
     bool? enabled,
     int? thresholdBytes,
     int? quality,
   }) {
-    return CompressionSettings(
+    return CompressionConfig(
       enabled: enabled ?? this.enabled,
       thresholdBytes: thresholdBytes ?? this.thresholdBytes,
       quality: (quality ?? this.quality).clamp(1, 100),
     );
   }
 
-  factory CompressionSettings.fromMap(Map<String, dynamic>? map) {
-    if (map == null) return const CompressionSettings();
-    return CompressionSettings(
+  factory CompressionConfig.fromMap(Map<String, dynamic>? map) {
+    if (map == null) return const CompressionConfig();
+    return CompressionConfig(
       enabled: (map['enabled'] as bool?) ?? false,
       thresholdBytes: (map['thresholdBytes'] as num?)?.round() ?? 1024 * 1024,
       quality: ((map['quality'] as num?)?.round() ?? 70).clamp(1, 100),
@@ -191,15 +210,17 @@ class CloudProfile {
   };
 }
 
-/// Cloud upload settings, persisted locally and exposed to the UI.
-class SettingsModel extends ChangeNotifier {
-  SettingsModel() {
+/// Cloud upload configuration, persisted locally and exposed to the UI.
+class CloudModel extends ChangeNotifier {
+  CloudModel() {
     _profiles = _emptyProfiles();
   }
 
   List<CloudProfile> _profiles = [];
   String? _activeProfileId;
-  CompressionSettings _compression = const CompressionSettings();
+  CompressionConfig _compression = const CompressionConfig();
+  UploadNamingPattern _uploadNamingPattern =
+      UploadNamingPattern.datedHashFileName;
 
   List<CloudProfile> get profiles => List.unmodifiable(_profiles);
   List<CloudProfile> get selectableProfiles => _profiles
@@ -208,7 +229,8 @@ class SettingsModel extends ChangeNotifier {
   List<CloudProfile> get enabledProfiles => _profiles
       .where((p) => p.isEnabled && p.isConfigured)
       .toList(growable: false);
-  CompressionSettings get compression => _compression;
+  CompressionConfig get compression => _compression;
+  UploadNamingPattern get uploadNamingPattern => _uploadNamingPattern;
   String? get activeProfileId => activeProfile?.id;
 
   CloudProfile? get activeProfile {
@@ -262,10 +284,13 @@ class SettingsModel extends ChangeNotifier {
       _profiles = [_legacyR2Profile(map)];
       _activeProfileId = _profiles.first.id;
     }
-    _compression = CompressionSettings.fromMap(
+    _compression = CompressionConfig.fromMap(
       map['compression'] is Map
           ? Map<String, dynamic>.from(map['compression'] as Map)
           : null,
+    );
+    _uploadNamingPattern = UploadNamingPattern.fromName(
+      map['uploadNamingPattern'] as String?,
     );
     _ensureProviderPlaceholders();
     _repairActiveProfile();
@@ -276,10 +301,56 @@ class SettingsModel extends ChangeNotifier {
     'profiles': _profiles.map((p) => p.toMap()).toList(),
     'activeProfileId': _activeProfileId,
     'compression': _compression.toMap(),
+    'uploadNamingPattern': _uploadNamingPattern.name,
   };
 
-  void setCompression(CompressionSettings value) {
+  /// Appends validated imported profiles without changing existing local state.
+  ({int added}) mergeFromMap(Map<String, dynamic> map) {
+    final rawProfiles = map['profiles'];
+    final rawCompression = map['compression'];
+    if (rawProfiles is! List || rawCompression is! Map) {
+      throw const FormatException('Invalid cloud configuration.');
+    }
+
+    final importedProfiles = rawProfiles
+        .map((rawProfile) {
+          if (rawProfile is! Map) {
+            throw const FormatException('Invalid cloud profile.');
+          }
+          final profile = Map<String, dynamic>.from(rawProfile);
+          final id = profile['id'];
+          if (id is! String || id.trim().isEmpty) {
+            throw const FormatException('Cloud profile id is required.');
+          }
+          return CloudProfile.fromMap(profile);
+        })
+        .toList(growable: false);
+    final nextProfiles = [..._profiles];
+    final occupiedIds = nextProfiles.map((profile) => profile.id).toSet();
+    var added = 0;
+    for (final profile in importedProfiles) {
+      var importedProfile = profile;
+      while (!occupiedIds.add(importedProfile.id)) {
+        importedProfile = importedProfile.copyWith(id: _newProfileId());
+      }
+      nextProfiles.add(importedProfile);
+      added++;
+    }
+
+    _profiles = nextProfiles;
+    _ensureProviderPlaceholders();
+    _repairActiveProfile();
+    notifyListeners();
+    return (added: added);
+  }
+
+  void setCompression(CompressionConfig value) {
     _compression = value;
+    notifyListeners();
+  }
+
+  void setUploadNamingPattern(UploadNamingPattern value) {
+    _uploadNamingPattern = value;
     notifyListeners();
   }
 

@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
-import 'settings_model.dart';
+import 'cloud_model.dart';
 
 /// A single uploaded-image record shown in the gallery.
 class HistoryItem {

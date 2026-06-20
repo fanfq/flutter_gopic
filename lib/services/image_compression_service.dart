@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:image/image.dart' as img;
 
-import '../models/settings_model.dart';
+import '../models/cloud_model.dart';
 
 class PreparedImageUpload {
   const PreparedImageUpload({
@@ -21,7 +21,7 @@ class PreparedImageUpload {
 class ImageCompressionService {
   Future<PreparedImageUpload> prepare(
     File file,
-    CompressionSettings settings,
+    CompressionConfig config,
   ) async {
     final originalBytes = await file.readAsBytes();
     final originalName = _basename(file.path);
@@ -33,13 +33,13 @@ class ImageCompressionService {
       wasCompressed: false,
     );
 
-    if (!settings.shouldCompress(originalBytes.length)) return original;
+    if (!config.shouldCompress(originalBytes.length)) return original;
     if (!_canCompress(file.path)) return original;
 
     try {
       final decoded = img.decodeImage(originalBytes);
       if (decoded == null) return original;
-      final encoded = img.encodeJpg(decoded, quality: settings.quality);
+      final encoded = img.encodeJpg(decoded, quality: config.quality);
       if (encoded.length >= originalBytes.length) return original;
       return PreparedImageUpload(
         bytes: encoded,

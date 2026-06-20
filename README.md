@@ -113,7 +113,7 @@ lib/
 │   ├── mac_ui.dart                   # macOS 风格页面 / 面板组件
 │   └── theme.dart                    # Material 3 主题
 ├── models/
-│   ├── settings_model.dart           # 云服务配置、压缩配置、当前配置
+│   ├── cloud_model.dart           # 云服务配置、压缩配置、当前配置
 │   └── history_model.dart            # 上传历史
 ├── services/
 │   ├── aws_signer.dart               # AWS SigV4 签名
@@ -121,12 +121,12 @@ lib/
 │   ├── upload_service.dart           # 上传编排、URL 生成、历史写入
 │   ├── image_compression_service.dart# 上传前压缩
 │   ├── tray_service.dart             # Dart 侧状态栏上传桥接
-│   ├── settings_service.dart         # 配置持久化
+│   ├── cloud_service.dart         # 配置持久化
 │   └── history_service.dart          # 历史持久化和缩略图缓存
 ├── screens/
 │   ├── upload_screen.dart            # 上传页
 │   ├── gallery_screen.dart           # 图床页
-│   └── settings_screen.dart          # 云服务配置页
+│   └── cloud_screen.dart          # 云服务配置页
 └── utils/format.dart                 # 字节 / 时间格式化
 
 macos/Runner/
