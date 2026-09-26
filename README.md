@@ -8,7 +8,7 @@ GoPic 是一款基于 Flutter 的桌面图床 / CDN 上传工具，面向 macOS 
 ![](ScreenShot_2.png)
 ![](ScreenShot_3.png)
 
-## CATELOG
+## CATALOG
 
 ### 2026-09-26
 
