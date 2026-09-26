@@ -30,11 +30,14 @@ enum CloudProvider {
 }
 
 enum UploadNamingPattern {
+  /// Uses the source filename so the same object key overwrites remote content.
+  originalFileName,
   datedHashFileName,
   datedUuid,
   uuid;
 
   String get label => switch (this) {
+    UploadNamingPattern.originalFileName => '保持原文件名',
     UploadNamingPattern.datedHashFileName => '{YYYYMMDD}/{HASH}_{FILENAME}',
     UploadNamingPattern.datedUuid => '{YYYYMMDD}/{UUID}.{EXT}',
     UploadNamingPattern.uuid => '{UUID}.{EXT}',
@@ -220,7 +223,7 @@ class CloudModel extends ChangeNotifier {
   String? _activeProfileId;
   CompressionConfig _compression = const CompressionConfig();
   UploadNamingPattern _uploadNamingPattern =
-      UploadNamingPattern.datedHashFileName;
+      UploadNamingPattern.originalFileName;
 
   List<CloudProfile> get profiles => List.unmodifiable(_profiles);
   List<CloudProfile> get selectableProfiles => _profiles

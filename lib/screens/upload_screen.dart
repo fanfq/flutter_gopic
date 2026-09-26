@@ -12,6 +12,7 @@ import '../models/cloud_model.dart';
 import '../services/cloud_service.dart';
 import '../services/tray_service.dart';
 import '../services/upload_service.dart';
+import '../utils/format.dart';
 
 class UploadScreen extends StatefulWidget {
   const UploadScreen({super.key});
@@ -27,6 +28,7 @@ class _UploadEntry {
   String? status; // 'done' | 'error'
   String? message;
   String? url;
+  int bytesPerSecond = 0;
 }
 
 class _UploadScreenState extends State<UploadScreen> {
@@ -280,8 +282,20 @@ class _UploadScreenState extends State<UploadScreen> {
                       color: Theme.of(context).colorScheme.primary,
                     ),
                   )
-                : LinearProgressIndicator(
-                    value: e.progress == 0 ? null : e.progress,
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LinearProgressIndicator(
+                        value: e.progress == 0 ? null : e.progress,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        e.bytesPerSecond == 0
+                            ? '正在准备上传…'
+                            : '${formatBytes(e.bytesPerSecond)}/s',
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ],
                   ),
             trailing: done
                 ? IconButton(
@@ -327,7 +341,16 @@ class _UploadScreenState extends State<UploadScreen> {
       final entry = _UploadEntry(name);
       setState(() => _entries.insert(0, entry));
       try {
-        final result = await service.uploadFile(File(path));
+        final result = await service.uploadFile(
+          File(path),
+          onProgress: (progress) {
+            if (!mounted) return;
+            setState(() {
+              entry.progress = progress.fraction;
+              entry.bytesPerSecond = progress.bytesPerSecond;
+            });
+          },
+        );
         entry
           ..progress = 1
           ..status = 'done'

@@ -36,12 +36,34 @@ class AwsSigV4Signer {
     String? token,
     DateTime? now,
   }) {
+    return signRequest(
+      method: 'PUT',
+      host: host,
+      objectKey: objectKey,
+      contentLength: contentLength,
+      contentType: contentType,
+      token: token,
+      now: now,
+    );
+  }
+
+  /// Signs all S3 multipart lifecycle requests, including their query string.
+  Map<String, String> signRequest({
+    required String method,
+    required String host,
+    required String objectKey,
+    required int contentLength,
+    required String contentType,
+    String query = '',
+    String? token,
+    DateTime? now,
+  }) {
     final t = now ?? DateTime.now().toUtc();
     final amzDate = _amzDate(t);
     final dateStamp = _dateStamp(t);
 
     final canonicalUri = _canonicalUri(objectKey);
-    final canonicalQueryString = '';
+    final canonicalQueryString = _canonicalQuery(query);
 
     // Headers must be lowercase and sorted for the canonical request.
     final headers = <String, String>{
@@ -54,12 +76,13 @@ class AwsSigV4Signer {
     }..removeWhere((_, v) => v.isEmpty);
 
     final sortedHeaders = headers.keys.toList()..sort();
-    final canonicalHeaders =
-        sortedHeaders.map((k) => '$k:${headers[k]!.trim()}\n').join();
+    final canonicalHeaders = sortedHeaders
+        .map((k) => '$k:${headers[k]!.trim()}\n')
+        .join();
     final signedHeaders = sortedHeaders.join(';');
 
     final canonicalRequest = [
-      'PUT',
+      method,
       canonicalUri,
       canonicalQueryString,
       canonicalHeaders,
@@ -96,6 +119,18 @@ class AwsSigV4Signer {
     };
   }
 
+  String _canonicalQuery(String query) {
+    if (query.isEmpty) return '';
+    final entries = Uri.splitQueryString(query).entries.toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    return entries
+        .map(
+          (e) =>
+              '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}',
+        )
+        .join('&');
+  }
+
   String _canonicalUri(String objectKey) {
     // Path must be URL-encoded except for the slashes that separate segments.
     // R2 keys may contain spaces / unicode; encode each segment individually.
@@ -128,7 +163,10 @@ class AwsSigV4Signer {
   }
 
   List<int> _deriveSigningKey(String dateStamp) {
-    final kDate = _hmac(utf8.encode('AWS4$secretAccessKey'), utf8.encode(dateStamp));
+    final kDate = _hmac(
+      utf8.encode('AWS4$secretAccessKey'),
+      utf8.encode(dateStamp),
+    );
     final kRegion = _hmac(kDate, utf8.encode(region));
     final kService = _hmac(kRegion, utf8.encode(service));
     return _hmac(kService, utf8.encode('aws4_request'));

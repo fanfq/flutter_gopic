@@ -73,6 +73,36 @@ class HistoryModel extends ChangeNotifier {
         .toList(growable: false);
   }
 
+  /// Returns active-profile history filtered by a normalized extension. Empty
+  /// extension means all files, which keeps the gallery default inclusive.
+  List<HistoryItem> itemsForProfileAndExtension(
+    String? profileId,
+    String extension,
+  ) {
+    final items = itemsForProfile(profileId);
+    final normalized = extension.trim().toLowerCase().replaceFirst(
+      RegExp(r'^\.'),
+      '',
+    );
+    if (normalized.isEmpty) return items;
+    return items
+        .where((item) => _extensionOf(item.fileName) == normalized)
+        .toList(growable: false);
+  }
+
+  List<String> extensionsForProfile(String? profileId) =>
+      itemsForProfile(profileId)
+          .map((item) => _extensionOf(item.fileName))
+          .where((extension) => extension.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+
+  static String _extensionOf(String fileName) {
+    final dot = fileName.lastIndexOf('.');
+    return dot <= 0 ? '' : fileName.substring(dot + 1).toLowerCase();
+  }
+
   void loadFromJsonString(String json) {
     _items.clear();
     if (json.trim().isEmpty) {

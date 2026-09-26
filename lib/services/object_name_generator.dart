@@ -21,6 +21,7 @@ class ObjectNameGenerator {
   }) {
     final date = _datePart(_clock());
     return switch (pattern) {
+      UploadNamingPattern.originalFileName => _safeName(fileName),
       UploadNamingPattern.datedHashFileName =>
         '$date/${_hashFactory()}_${_safeName(fileName)}',
       UploadNamingPattern.datedUuid =>

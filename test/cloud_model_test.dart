@@ -2,10 +2,16 @@ import 'package:flutter_gopic/models/cloud_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('defaults new configurations to original filenames', () {
+    final model = CloudModel();
+
+    expect(model.uploadNamingPattern, UploadNamingPattern.originalFileName);
+  });
+
   test('defaults and persists the upload naming pattern', () {
     final model = CloudModel();
 
-    expect(model.uploadNamingPattern, UploadNamingPattern.datedHashFileName);
+    expect(model.uploadNamingPattern, UploadNamingPattern.originalFileName);
 
     model.setUploadNamingPattern(UploadNamingPattern.uuid);
     expect(model.toMap()['uploadNamingPattern'], 'uuid');

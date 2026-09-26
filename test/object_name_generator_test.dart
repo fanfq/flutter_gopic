@@ -38,4 +38,14 @@ void main() {
       'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg',
     );
   });
+
+  test('keeps the original safe filename for overwrite uploads', () {
+    expect(
+      generator.build(
+        pattern: UploadNamingPattern.originalFileName,
+        fileName: 'secret photo.jpg',
+      ),
+      'secret_photo.jpg',
+    );
+  });
 }

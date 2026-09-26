@@ -30,6 +30,12 @@ class CacheSummary {
   int get hashCode => Object.hash(directoryPath, fileCount, totalBytes);
 }
 
+class CacheExportResult {
+  const CacheExportResult({required this.exported, required this.failed});
+  final int exported;
+  final int failed;
+}
+
 /// Persists the upload history index and caches uploaded files locally so the
 /// gallery can show thumbnails even after the originals are moved or deleted.
 class HistoryService {
@@ -111,6 +117,45 @@ class HistoryService {
   Future<void> add(HistoryItem item) async {
     model.add(item);
     await save();
+  }
+
+  /// Copies selected cached originals to [destination] without touching remote
+  /// cloud objects or removing their upload history.
+  Future<CacheExportResult> exportCachedFiles({
+    required Set<String> ids,
+    required Directory destination,
+  }) async {
+    var exported = 0;
+    var failed = 0;
+    for (final item in model.items.where((item) => ids.contains(item.id))) {
+      final sourcePath = item.localThumbPath;
+      if (sourcePath == null || !await File(sourcePath).exists()) {
+        failed++;
+        continue;
+      }
+      try {
+        final source = File(sourcePath);
+        var target = File(p.join(destination.path, item.fileName));
+        var copyIndex = 1;
+        while (await target.exists()) {
+          final ext = p.extension(item.fileName);
+          final base = p.basenameWithoutExtension(item.fileName);
+          target = File(p.join(destination.path, '$base ($copyIndex)$ext'));
+          copyIndex++;
+        }
+        await source.copy(target.path);
+        exported++;
+      } catch (_) {
+        failed++;
+      }
+    }
+    return CacheExportResult(exported: exported, failed: failed);
+  }
+
+  Future<void> removeMany(Set<String> ids) async {
+    for (final id in ids.toList()) {
+      if (model.items.any((item) => item.id == id)) await remove(id);
+    }
   }
 
   Future<void> remove(String id, {bool deleteCache = true}) async {

@@ -10,6 +10,9 @@ import 'image_compression_service.dart';
 import 'object_name_generator.dart';
 import 'qiniu_signer.dart';
 import 'cloud_service.dart';
+import 'upload_progress.dart';
+import 's3_multipart_uploader.dart';
+import 'qiniu_resumable_uploader.dart';
 
 class UploadResult {
   final String url;
@@ -62,7 +65,10 @@ class UploadService {
   }
 
   /// Upload a local file to the active cloud profile. Returns the public URL and object key.
-  Future<UploadResult> uploadFile(File file) async {
+  Future<UploadResult> uploadFile(
+    File file, {
+    void Function(UploadProgress progress)? onProgress,
+  }) async {
     final profile = _requireProfile();
 
     final prepared = await imageCompressionService.prepare(
@@ -73,6 +79,17 @@ class UploadService {
     final size = bytes.length;
     final contentType = prepared.contentType;
     if (profile.provider == CloudProvider.qiniu) {
+      if (size > 10 * 1024 * 1024) {
+        return _uploadQiniuResumable(
+          file: file,
+          profile: profile,
+          fileName: prepared.fileName,
+          bytes: bytes,
+          size: size,
+          contentType: contentType,
+          onProgress: onProgress,
+        );
+      }
       return _uploadQiniu(
         file: file,
         profile: profile,
@@ -80,6 +97,7 @@ class UploadService {
         bytes: bytes,
         size: size,
         contentType: contentType,
+        onProgress: onProgress,
       );
     }
 
@@ -96,6 +114,34 @@ class UploadService {
       region: profile.region.trim().isEmpty ? 'auto' : profile.region.trim(),
     );
 
+    if (size > 10 * 1024 * 1024) {
+      try {
+        await S3MultipartUploader().upload(
+          objectUri: Uri.parse(
+            '${profile.endpoint.trim().replaceAll(RegExp(r'/+$'), '')}$objectKey',
+          ),
+          host: host,
+          objectKey: objectKey,
+          bytes: bytes,
+          contentType: contentType,
+          signer: signer,
+          onProgress: onProgress,
+        );
+      } on UploadException {
+        rethrow;
+      } catch (e) {
+        throw UploadException('S3 分片上传发生未知错误: $e');
+      }
+      return _recordCompletedUpload(
+        file: file,
+        profile: profile,
+        fileName: prepared.fileName,
+        objectKey: objectKey,
+        size: size,
+        contentType: contentType,
+      );
+    }
+
     final headers = signer.signPut(
       host: host,
       objectKey: objectKey,
@@ -108,6 +154,7 @@ class UploadService {
     );
 
     HttpClient? client;
+    final progressTracker = UploadProgressTracker();
     try {
       client = HttpClient();
       // Cloudflare R2 supports path-style: https://<account>.r2.cloudflarestorage.com/<bucket>/<key>
@@ -115,6 +162,8 @@ class UploadService {
       headers.forEach((k, v) => request.headers.set(k, v));
       request.add(bytes);
       final response = await request.close();
+      progressTracker.addBytes(size);
+      onProgress?.call(progressTracker.snapshot(totalBytes: size));
 
       final body = await _readResponse(response);
 
@@ -163,6 +212,85 @@ class UploadService {
     }
   }
 
+  Future<UploadResult> _uploadQiniuResumable({
+    required File file,
+    required CloudProfile profile,
+    required String fileName,
+    required List<int> bytes,
+    required int size,
+    required String contentType,
+    void Function(UploadProgress progress)? onProgress,
+  }) async {
+    final objectKey = _buildObjectName(profile, fileName);
+    final endpoint = profile.endpoint.trim().replaceAll(RegExp(r'/+$'), '');
+    if (endpoint.isEmpty) throw UploadException('七牛云上传域名不能为空。');
+    final token =
+        QiniuUploadTokenSigner(
+          accessKey: profile.accessKeyId.trim(),
+          secretKey: profile.secretAccessKey.trim(),
+        ).signUploadToken(
+          bucket: profile.bucket.trim(),
+          objectKey: objectKey,
+          deadline: DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3600,
+        );
+    try {
+      await QiniuResumableUploader().upload(
+        endpoint: Uri.parse(endpoint),
+        token: token,
+        objectKey: objectKey,
+        bytes: bytes,
+        onProgress: onProgress,
+      );
+      return _recordCompletedUpload(
+        file: file,
+        profile: profile,
+        fileName: fileName,
+        objectKey: objectKey,
+        size: size,
+        contentType: contentType,
+      );
+    } on UploadException {
+      rethrow;
+    } catch (e) {
+      throw UploadException('七牛云分片上传发生未知错误: $e');
+    }
+  }
+
+  Future<UploadResult> _recordCompletedUpload({
+    required File file,
+    required CloudProfile profile,
+    required String fileName,
+    required String objectKey,
+    required int size,
+    required String contentType,
+  }) async {
+    final url = _buildPublicUrl(profile, objectKey);
+    String? localPath;
+    try {
+      localPath = await historyService.cacheFile(
+        file.path,
+        _basename(file.path),
+      );
+    } catch (_) {
+      /* thumbnail cache is non-fatal */
+    }
+    await historyService.add(
+      HistoryItem(
+        id: _newId(),
+        fileName: fileName,
+        objectKey: objectKey,
+        url: url,
+        sizeBytes: size,
+        contentType: contentType,
+        uploadedAt: DateTime.now(),
+        localThumbPath: localPath,
+        cloudProfileId: profile.id,
+        cloudProvider: profile.provider,
+      ),
+    );
+    return UploadResult(url, objectKey);
+  }
+
   /// Build the S3-compatible object key: optional prefix + selected object name.
   String _buildS3ObjectKey(CloudProfile profile, String fileName) {
     return '/${profile.bucket.trim()}/${_buildObjectName(profile, fileName)}';
@@ -190,6 +318,7 @@ class UploadService {
     required List<int> bytes,
     required int size,
     required String contentType,
+    void Function(UploadProgress progress)? onProgress,
   }) async {
     final objectKey = _buildObjectName(profile, fileName);
     final endpoint = profile.endpoint.trim().replaceAll(RegExp(r'/+$'), '');
@@ -208,6 +337,7 @@ class UploadService {
         );
 
     HttpClient? client;
+    final progressTracker = UploadProgressTracker();
     try {
       client = HttpClient();
       final request = await client.openUrl('POST', Uri.parse(endpoint));
@@ -227,6 +357,8 @@ class UploadService {
       request.headers.set(HttpHeaders.contentLengthHeader, body.length);
       request.add(body);
       final response = await request.close();
+      progressTracker.addBytes(size);
+      onProgress?.call(progressTracker.snapshot(totalBytes: size));
       final responseBody = await _readResponse(response);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {

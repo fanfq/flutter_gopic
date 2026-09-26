@@ -3,6 +3,38 @@ import 'package:flutter_gopic/models/cloud_model.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('filters a profile by case-insensitive file extension', () {
+    final history = HistoryModel()
+      ..add(
+        HistoryItem(
+          id: 'png',
+          fileName: 'one.PNG',
+          objectKey: '/one.PNG',
+          url: 'https://x/one.PNG',
+          sizeBytes: 1,
+          contentType: 'image/png',
+          uploadedAt: DateTime(2026),
+          cloudProfileId: 'profile',
+        ),
+      )
+      ..add(
+        HistoryItem(
+          id: 'jpg',
+          fileName: 'two.jpg',
+          objectKey: '/two.jpg',
+          url: 'https://x/two.jpg',
+          sizeBytes: 1,
+          contentType: 'image/jpeg',
+          uploadedAt: DateTime(2026),
+          cloudProfileId: 'profile',
+        ),
+      );
+
+    expect(
+      history.itemsForProfileAndExtension('profile', 'png').single.id,
+      'png',
+    );
+  });
   test('filters gallery items by active cloud profile', () {
     final now = DateTime(2026, 6, 16);
     final history = HistoryModel()

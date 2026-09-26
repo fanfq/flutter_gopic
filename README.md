@@ -8,6 +8,17 @@ GoPic 是一款基于 Flutter 的桌面图床 / CDN 上传工具，面向 macOS 
 ![](ScreenShot_2.png)
 ![](ScreenShot_3.png)
 
+## CATELOG
+
+### 2026-09-26
+
+- 上传命名新增并默认使用「保持原文件名」：相同路径下的同名对象会由云端覆盖。
+- 大于 10 MiB 的文件启用分片上传：S3 兼容服务使用 Multipart Upload，七牛云使用 `mkblk` / `mkfile` 分片协议，并发数上限为 4。
+- 上传队列新增进度速率显示；小于 250ms 的样本不会显示不可信的瞬时速率。
+- 图床新增文件扩展名筛选（默认「全部」）、多选、导出本地缓存至指定目录，以及批量删除本地记录和缓存；批量删除不会删除云端对象。
+- About 按钮会在外部浏览器打开 [flutter_gopic](https://github.com/fanfq/flutter_gopic)。
+- 修复七牛分片合并：`mkfile` 使用 `text/plain` 上下文请求体，并保留 URL-safe Base64 填充。
+
 ## 当前功能
 
 - 图片上传：支持拖拽到主窗口、点击选择文件，也支持拖拽图片到 macOS 状态栏图标快速上传。
@@ -16,7 +27,7 @@ GoPic 是一款基于 Flutter 的桌面图床 / CDN 上传工具，面向 macOS 
 - 配置占位：腾讯云 COS、阿里云 OSS 目前可保存配置，上传协议仍待完整接入。
 - 自动签名：S3 兼容服务使用 AWS Signature V4，七牛云使用上传 Token。
 - 链接复制：上传完成后可复制 URL；状态栏拖拽上传成功后会把链接自动写入剪贴板。
-- 图床相册：按当前云配置过滤历史记录，支持缩略图、本地预览、复制 URL、复制 Markdown、删除记录和清空当前配置历史。
+- 图床相册：按当前云配置及文件扩展名过滤历史记录，支持缩略图、本地预览、复制 URL、复制 Markdown、多选导出本地缓存、删除记录和清空当前配置历史。
 - 上传前压缩：可启用图片压缩，设置触发阈值和 JPEG 质量；只有压缩后体积更小时才使用压缩结果。
 - 本地持久化：云服务配置、压缩配置、上传历史和本地缩略图缓存都保存在本机。
 - macOS 原生体验：状态栏图标、最近上传菜单、浅色 / 深色主题、桌面拖拽。
@@ -66,13 +77,13 @@ GoPic 是一款基于 Flutter 的桌面图床 / CDN 上传工具，面向 macOS 
 | 路径前缀 | 可选，例如 `images/` |
 | Path-style URL | 多数 S3 兼容服务可保持启用 |
 
-对象名规则为：
+默认对象名规则为：
 
 ```text
-<路径前缀>/<yyyyMMdd>/<随机前缀>_<原文件名>
+<路径前缀>/<原文件名>
 ```
 
-S3 兼容上传请求会使用 `PUT`，并按对象大小和 Content-Type 生成 AWS SigV4 签名。
+同一对象名会覆盖云端已有对象。S3 兼容上传请求会使用 `PUT`，并按对象大小和 Content-Type 生成 AWS SigV4 签名；大于 10 MiB 时使用并发 Multipart Upload。
 
 ### 七牛云
 
@@ -85,7 +96,7 @@ S3 兼容上传请求会使用 `PUT`，并按对象大小和 Content-Type 生成
 | 公网 URL 前缀 | 必填，上传完成后用于生成访问 URL |
 | 路径前缀 | 可选，例如 `images/` |
 
-七牛云上传会生成 1 小时有效期的上传 Token，并使用 multipart 表单提交文件。
+七牛云上传会生成 1 小时有效期的上传 Token。小文件使用 multipart 表单提交；大于 10 MiB 时使用并发的 `mkblk` / `mkfile` 分片上传。
 
 ## macOS 状态栏上传
 
@@ -180,10 +191,11 @@ flutter analyze
 - 增加 Windows / Linux 桌面体验适配。
 
 
-## Flutter 3.38.9
+## Flutter 3.44.9
 ```
-Flutter 3.38.9 • channel stable • https://github.com/flutter/flutter.git
-Framework • revision 67323de285 (5 months ago) • 2026-01-28 13:43:12 -0800
-Engine • hash 5eb06b7ad5bb8cbc22c5230264c7a00ceac7674b (revision 587c18f873) (4 months ago) • 2026-01-27 23:23:03.000Z
-Tools • Dart 3.10.8 • DevTools 2.51.1
+Flutter 3.44.9 • channel stable • https://github.com/flutter/flutter.git
+Framework • revision 6b182d2c75 (7 weeks ago) • 2026-08-05 10:04:07 -0700
+Engine • hash b9499e4c25212536ba3a4eec4f5c1905fb3214fe (revision 5a2a6a42cc) (1
+months ago) • 2026-07-31 18:31:59.000Z
+Tools • Dart 3.12.2 • DevTools 2.57.0
 ```

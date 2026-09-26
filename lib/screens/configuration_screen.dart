@@ -89,7 +89,7 @@ class _ConfigurationScreenState extends State<ConfigurationScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '后续上传的文件将按所选规则命名。UUID 规则不会包含原文件名。',
+                  '后续上传的文件将按所选规则命名。保持原文件名时，相同路径下的同名云端文件会被覆盖。',
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 const SizedBox(height: 16),
